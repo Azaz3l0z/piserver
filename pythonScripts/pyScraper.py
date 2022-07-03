@@ -3,6 +3,9 @@ import sys
 import json
 import scrapeScout as scout
 import scrapeMobileDE as mobile
+import htmlToPDF as downloadPDF
+
+from multiprocessing import Process
 
 
 class SiteNotInDatabase(Exception):
@@ -11,8 +14,8 @@ class SiteNotInDatabase(Exception):
 
 if __name__ == "__main__":
     # Args
-    url = sys.argv[1]
-    pdf_path = sys.argv[2]
+    url = sys.argv[1].replace('"', '')
+    pdf_path = '../files'
 
     # Chdir
     if getattr(sys, 'frozen', False):
@@ -21,23 +24,27 @@ if __name__ == "__main__":
         os.chdir(os.path.abspath(os.path.dirname(__file__)))
     os.chdir(os.path.dirname(os.getcwd()))
 
-    # # Make folders
-    # folders = ['pdfs', 'html']
-    # for folder in folders:
-    #     path = os.path.join(os.getcwd(), 'files', folder)
-    #     if not os.path.isdir(path):
-    #         os.makedirs(path)
+    pdf_path = os.path.join(os.getcwd(), 'files')
 
     ans = ''
     try:
         if 'mobile.de' in url:
-            ans = mobile.main(url, pdf_path)
-        elif 'autoscout24.es' in url:
-            ans = scout.main(url, pdf_path)
+            scrpr = mobile.Scraper(url)
+            data = scrpr.scrape()
+            pdf = scrpr.pdf(data['title'], pdf_path)
+
+        elif 'autoscout24' in url:
+            scrpr = scout.Scraper(url)
+            data = scrpr.scrape()
+            pdf = scrpr.pdf(data['title'], pdf_path)
+
         else:
             raise(SiteNotInDatabase)
+
+        data['pdf'] = pdf
+
     except SiteNotInDatabase:
         print(json.dumps({'Response': 'Site Not Found'}))
 
     else:
-        print(json.dumps(ans, ensure_ascii=False))
+        print(json.dumps(data, ensure_ascii=False))

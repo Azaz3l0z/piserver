@@ -8,7 +8,8 @@ from bs4 import BeautifulSoup
 
 class Scraper(object):
     def __init__(self, url) -> None:
-        self.url = url
+        # Fix possible whitespaces errors
+        self.url = url.strip()
         self.headers = {
             'Host': 'www.mobile.de',
             'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0',
@@ -37,14 +38,11 @@ class Scraper(object):
             'vhc:car,dmg:false/pg:vipcar/{id}.html'
 
         self.url += '&'
-        fields = re.findall(r'(?<=[\?&])(.+?)(?=[&\s])', self.url)
-        url_data = {}
+        id = re.search('\d{9}', self.url)
 
-        for field in fields:
-            key = re.match(r'(.+?)(?=\=)', field).group()
-            url_data[key] = field.replace(key+'=', '')
-
-        self.url = urlES.format(id=url_data['id'])
+        if id != None:
+            id = id.group()
+        self.url = urlES.format(id=id)
 
     def scrape(self):
         def images():
@@ -85,7 +83,7 @@ class Scraper(object):
                 'transmission': '(?<=Cambio)(.+)?',
                 'fuel': '(?<=Combustible)(.+)?',
                 'km': '\d+(?=\s+?km)',
-                'power': '\d+(?=\s+?cv)',
+                'power': '\d+(?=\s+?HP)',
                 'c02': '\d+(?=\s+?g/km)'
             }
             # Find the text from each row
@@ -154,31 +152,23 @@ class Scraper(object):
 
         # Soup
         soup = BeautifulSoup(self.request.text, 'html.parser')
+
         images = images()
 
         data = data()
         data['vendedor'] = vendor()
 
+        # Fix and parse strings
+        data['title'] = re.sub('[^A-Za-z0-9\s-]+', '', data['title'])
         return data
 
     def pdf(self, title: str, pdf_folder: str):
         # Paths
         now = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         file_html = os.path.join(pdf_folder, f'{now}_{title}.html')
-        file_pdf = os.path.join(pdf_folder, f'{now}_{title}.pdf')
 
         # Create html
         with open(file_html, 'w+') as file:
             file.write(self.request.text)
 
-        # PDF
-        htmlToPDF.htmlToPDF(file_html, file_pdf)
-
-        return file_pdf
-
-
-def main(url: str, pdf_folder: str):
-    scrpr = Scraper(url)
-    data = scrpr.scrape()
-    data['file'] = scrpr.pdf(data['title'], pdf_folder)
-    return data
+        return file_html
